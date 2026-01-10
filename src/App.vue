@@ -7,17 +7,13 @@
       src="https://azglasuvam.net/#next"
     ></iframe>
 
-    <!-- 3D NIGHTMARE SCENE -->
-    <NightmareScene
-      :intensity="effects.staticNoise"
-      :eye-count="effects.eyeCount"
-      :blood-particles="effects.bloodDrips"
-    />
+    <!-- FLOATING EYES -->
+    <FloatingEyes :count="effects.eyeCount" />
 
     <!-- 2D EFFECTS OVERLAY -->
     <StaticNoise :intensity="effects.staticNoise" />
     <BloodDrips :active="effects.bloodDrips" :count="8" />
-    <GhostMessages :active="effects.ghostMessages" :interval="1500" :max-visible="4" :speak-messages="true" />
+    <GhostMessages :active="effects.ghostMessages" :interval="1500" :max-visible="4" :speak-messages="false" />
 
     <!-- FINAL QUESTION -->
     <FinalQuestion
@@ -44,7 +40,7 @@ import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import StaticNoise from './components/effects/StaticNoise.vue'
 import BloodDrips from './components/effects/BloodDrips.vue'
 import GhostMessages from './components/effects/GhostMessages.vue'
-import NightmareScene from './components/effects/NightmareScene.vue'
+import FloatingEyes from './components/effects/FloatingEyes.vue'
 import FinalQuestion from './components/FinalQuestion.vue'
 import SuccessOverlay from './components/SuccessOverlay.vue'
 
@@ -56,6 +52,50 @@ function speak(text) {
     utterance.rate = 0.9
     utterance.pitch = 0.8
     speechSynthesis.speak(utterance)
+  }
+}
+
+// Voice loop - фрази при "Не"
+const angryPhrases = [
+  "Твоята пасивност е глас за корупцията.",
+  "Докато ти мълчиш, други решават вместо теб.",
+  "Докато ти отказваш, на тях им е удобно.",
+  "Системата печели когато ти се откажеш.",
+  "Мислиш ли че няма значение? Те разчитат на това.",
+  "Един глас по-малко. Точно това искат.",
+  "Страхът ти е тяхната победа.",
+  "Без теб демокрацията умира.",
+]
+
+let voiceLoopTimeout = null
+let currentPhraseIndex = 0
+
+function startVoiceLoop() {
+  currentPhraseIndex = 0
+  speakNextPhrase()
+}
+
+function speakNextPhrase() {
+  if ('speechSynthesis' in window) {
+    const utterance = new SpeechSynthesisUtterance(angryPhrases[currentPhraseIndex])
+    utterance.lang = 'bg-BG'
+    utterance.rate = 0.85
+    utterance.pitch = 0.7
+    utterance.volume = 1.0
+    speechSynthesis.speak(utterance)
+
+    currentPhraseIndex = (currentPhraseIndex + 1) % angryPhrases.length
+    voiceLoopTimeout = setTimeout(speakNextPhrase, 5000)
+  }
+}
+
+function stopVoiceLoop() {
+  if (voiceLoopTimeout) {
+    clearTimeout(voiceLoopTimeout)
+    voiceLoopTimeout = null
+  }
+  if ('speechSynthesis' in window) {
+    speechSynthesis.cancel()
   }
 }
 
@@ -74,6 +114,7 @@ const TIMELINE = [
   { time: 17, action: () => {
     effects.ghostMessages = false  // Спри ghost съобщенията
     if ('speechSynthesis' in window) speechSynthesis.cancel()  // Спри TTS
+    effects.eyeCount = 8  // Добави още очи за финала
     showQuestion.value = true
     speak('Ще гласуваш ли?')
   } },
@@ -111,14 +152,18 @@ function stopAllEffects() {
   effects.ghostMessages = false
   effects.glitchText = false
 
-  // Спри TTS
-  if ('speechSynthesis' in window) {
-    speechSynthesis.cancel()
-  }
+  // Спри voice loop
+  stopVoiceLoop()
 
+  // Спри сирената
   if (sirenAudio.value) {
     sirenAudio.value.pause()
     sirenAudio.value.currentTime = 0
+  }
+
+  // Спри вибрацията
+  if ('vibrate' in navigator) {
+    navigator.vibrate(0)
   }
 }
 
@@ -129,10 +174,22 @@ function handleYes() {
 }
 
 function handleNo() {
-  // Ескалирай още повече
-  effects.staticNoise = 0.15
-  speak('Грешен избор!')
+  // МАКСИМАЛНА ЕСКАЛАЦИЯ
+  effects.staticNoise = 0.4
+  effects.eyeCount = 20
+  effects.bloodDrips = true
+  effects.glitchText = true
+
+  // Сирена
   if (sirenAudio.value) sirenAudio.value.play().catch(() => {})
+
+  // Вибрация
+  if ('vibrate' in navigator) {
+    navigator.vibrate([500, 100, 500, 100, 500])
+  }
+
+  // Voice loop
+  startVoiceLoop()
 }
 
 function handleClose() {

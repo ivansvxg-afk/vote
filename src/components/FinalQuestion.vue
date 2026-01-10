@@ -266,7 +266,7 @@ onUnmounted(() => {
   inset: 0;
   display: grid;
   place-items: center;
-  background: #000;
+  background: rgba(0, 0, 0, 0.7);
   z-index: 1000;
   overflow: hidden;
 }

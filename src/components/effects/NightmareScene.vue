@@ -1,5 +1,12 @@
 <template>
   <div ref="container" class="nightmare-scene"></div>
+  <!-- Invisible overlay to capture mouse events over iframe -->
+  <div
+    v-if="props.eyeCount > 0"
+    class="mouse-tracker"
+    @mousemove="trackMouse"
+    @click="passClick"
+  ></div>
 </template>
 
 <script setup>
@@ -18,6 +25,33 @@ let scene, camera, renderer, animationId
 let eyes = []
 let particles = null
 let time = 0
+let mouse = { x: 0, y: 0 }
+
+function onMouseMove(event) {
+  // Normalize mouse coordinates to -1 to 1
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1
+}
+
+// Exposed for template
+function trackMouse(event) {
+  onMouseMove(event)
+}
+
+// Allow clicks to pass through to iframe
+function passClick(event) {
+  const overlay = event.target
+  overlay.style.pointerEvents = 'none'
+
+  const elementBelow = document.elementFromPoint(event.clientX, event.clientY)
+  if (elementBelow) {
+    elementBelow.click()
+  }
+
+  setTimeout(() => {
+    overlay.style.pointerEvents = 'auto'
+  }, 100)
+}
 
 function init() {
   if (!container.value) return
@@ -66,13 +100,109 @@ function init() {
 
   // Handle resize
   window.addEventListener('resize', onResize)
+
+  // Handle mouse move for eye tracking
+  window.addEventListener('mousemove', onMouseMove)
 }
 
 function createEye() {
   const group = new THREE.Group()
 
-  // Outer glow sphere
-  const glowGeometry = new THREE.SphereGeometry(2.2, 32, 32)
+  // Create canvas texture for realistic eye
+  const canvas = document.createElement('canvas')
+  canvas.width = 512
+  canvas.height = 512
+  const ctx = canvas.getContext('2d')
+
+  // Draw eyeball base (gradient white to slight pink)
+  const eyeGradient = ctx.createRadialGradient(256, 256, 0, 256, 256, 256)
+  eyeGradient.addColorStop(0, '#ffffff')
+  eyeGradient.addColorStop(0.7, '#fff5f5')
+  eyeGradient.addColorStop(1, '#ffcccc')
+  ctx.fillStyle = eyeGradient
+  ctx.beginPath()
+  ctx.arc(256, 256, 250, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Draw blood veins
+  ctx.strokeStyle = '#cc0000'
+  ctx.lineWidth = 2
+  for (let i = 0; i < 15; i++) {
+    const angle = (Math.PI * 2 / 15) * i + Math.random() * 0.3
+    const startX = 256 + Math.cos(angle) * 80
+    const startY = 256 + Math.sin(angle) * 80
+    const endX = 256 + Math.cos(angle) * (200 + Math.random() * 50)
+    const endY = 256 + Math.sin(angle) * (200 + Math.random() * 50)
+
+    ctx.beginPath()
+    ctx.moveTo(startX, startY)
+    const cp1x = startX + (Math.random() - 0.5) * 60
+    const cp1y = startY + (Math.random() - 0.5) * 60
+    ctx.quadraticCurveTo(cp1x, cp1y, endX, endY)
+    ctx.stroke()
+  }
+
+  // Draw iris (red/orange gradient)
+  const irisGradient = ctx.createRadialGradient(256, 256, 0, 256, 256, 80)
+  irisGradient.addColorStop(0, '#000000')
+  irisGradient.addColorStop(0.3, '#220000')
+  irisGradient.addColorStop(0.5, '#660000')
+  irisGradient.addColorStop(0.7, '#cc0000')
+  irisGradient.addColorStop(0.85, '#ff3300')
+  irisGradient.addColorStop(1, '#ff6600')
+  ctx.fillStyle = irisGradient
+  ctx.beginPath()
+  ctx.arc(256, 256, 80, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Draw iris pattern (radial lines)
+  ctx.strokeStyle = '#440000'
+  ctx.lineWidth = 1
+  for (let i = 0; i < 36; i++) {
+    const angle = (Math.PI * 2 / 36) * i
+    ctx.beginPath()
+    ctx.moveTo(256 + Math.cos(angle) * 25, 256 + Math.sin(angle) * 25)
+    ctx.lineTo(256 + Math.cos(angle) * 75, 256 + Math.sin(angle) * 75)
+    ctx.stroke()
+  }
+
+  // Draw pupil (vertical slit)
+  ctx.fillStyle = '#000000'
+  ctx.beginPath()
+  ctx.ellipse(256, 256, 8, 35, 0, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Add glow to pupil
+  const pupilGlow = ctx.createRadialGradient(256, 256, 0, 256, 256, 40)
+  pupilGlow.addColorStop(0, 'rgba(255, 0, 0, 0.3)')
+  pupilGlow.addColorStop(1, 'rgba(255, 0, 0, 0)')
+  ctx.fillStyle = pupilGlow
+  ctx.beginPath()
+  ctx.arc(256, 256, 40, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Specular highlight
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'
+  ctx.beginPath()
+  ctx.ellipse(220, 220, 25, 15, -0.5, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Create texture from canvas
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.needsUpdate = true
+
+  // Eye sphere with texture
+  const eyeGeometry = new THREE.SphereGeometry(2, 64, 64)
+  const eyeMaterial = new THREE.MeshBasicMaterial({
+    map: texture,
+  })
+  const eyeball = new THREE.Mesh(eyeGeometry, eyeMaterial)
+  // Rotate to face forward (fix UV mapping orientation)
+  eyeball.rotation.y = Math.PI
+  group.add(eyeball)
+
+  // Outer glow
+  const glowGeometry = new THREE.SphereGeometry(2.5, 32, 32)
   const glowMaterial = new THREE.MeshBasicMaterial({
     color: 0xff0000,
     transparent: true,
@@ -82,108 +212,15 @@ function createEye() {
   const glow = new THREE.Mesh(glowGeometry, glowMaterial)
   group.add(glow)
 
-  // Eyeball - creamy white with slight yellow tint
-  const eyeGeometry = new THREE.SphereGeometry(1.5, 64, 64)
-  const eyeMaterial = new THREE.MeshStandardMaterial({
-    color: 0xfffaf0,
-    roughness: 0.3,
-    metalness: 0.1,
-    emissive: 0x331111,
-    emissiveIntensity: 0.3
-  })
-  const eyeball = new THREE.Mesh(eyeGeometry, eyeMaterial)
-  group.add(eyeball)
-
-  // Blood veins - more detailed
-  for (let i = 0; i < 12; i++) {
-    const veinCurve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0, 0, 1.5),
-      new THREE.Vector3(
-        (Math.random() - 0.5) * 0.8,
-        (Math.random() - 0.5) * 0.8,
-        1.3
-      ),
-      new THREE.Vector3(
-        (Math.random() - 0.5) * 1.5,
-        (Math.random() - 0.5) * 1.5,
-        0.8
-      )
-    ])
-    const veinGeo = new THREE.TubeGeometry(veinCurve, 10, 0.02 + Math.random() * 0.02, 6, false)
-    const veinMat = new THREE.MeshBasicMaterial({
-      color: new THREE.Color(0.6 + Math.random() * 0.4, 0, 0)
-    })
-    const vein = new THREE.Mesh(veinGeo, veinMat)
-    vein.rotation.z = (Math.PI * 2 / 12) * i
-    group.add(vein)
-  }
-
-  // Iris - glowing red ring
-  const irisGeometry = new THREE.RingGeometry(0.3, 0.8, 64)
-  const irisMaterial = new THREE.MeshBasicMaterial({
-    color: 0xff2200,
-    side: THREE.DoubleSide
-  })
-  const iris = new THREE.Mesh(irisGeometry, irisMaterial)
-  iris.position.z = 1.48
-  group.add(iris)
-
-  // Iris glow
-  const irisGlowGeo = new THREE.CircleGeometry(0.9, 32)
-  const irisGlowMat = new THREE.MeshBasicMaterial({
-    color: 0xff0000,
-    transparent: true,
-    opacity: 0.4
-  })
-  const irisGlow = new THREE.Mesh(irisGlowGeo, irisGlowMat)
-  irisGlow.position.z = 1.46
-  group.add(irisGlow)
-
-  // Pupil - vertical slit like a demon/cat
-  const pupilShape = new THREE.Shape()
-  pupilShape.moveTo(0, -0.35)
-  pupilShape.quadraticCurveTo(0.12, 0, 0, 0.35)
-  pupilShape.quadraticCurveTo(-0.12, 0, 0, -0.35)
-
-  const pupilGeo = new THREE.ShapeGeometry(pupilShape)
-  const pupilMat = new THREE.MeshBasicMaterial({ color: 0x000000 })
-  const pupil = new THREE.Mesh(pupilGeo, pupilMat)
-  pupil.position.z = 1.5
-  group.add(pupil)
-
-  // Inner pupil glow (subtle red core)
-  const pupilCore = new THREE.Mesh(
-    new THREE.CircleGeometry(0.05, 16),
-    new THREE.MeshBasicMaterial({ color: 0xff0000 })
-  )
-  pupilCore.position.z = 1.51
-  group.add(pupilCore)
-
-  // Cornea - transparent bulge
-  const corneaGeo = new THREE.SphereGeometry(0.9, 32, 32, 0, Math.PI * 2, 0, Math.PI / 2)
-  const corneaMat = new THREE.MeshPhysicalMaterial({
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0.2,
-    roughness: 0,
-    metalness: 0,
-    clearcoat: 1,
-    clearcoatRoughness: 0
-  })
-  const cornea = new THREE.Mesh(corneaGeo, corneaMat)
-  cornea.position.z = 1.1
-  cornea.rotation.x = -Math.PI / 2
-  group.add(cornea)
-
-  // Random position - spread out more
+  // Random position
   group.position.set(
-    (Math.random() - 0.5) * 50,
-    (Math.random() - 0.5) * 35,
-    (Math.random() - 0.5) * 30 - 5
+    (Math.random() - 0.5) * 40,
+    (Math.random() - 0.5) * 30,
+    (Math.random() - 0.5) * 20 - 10
   )
 
   // Random scale
-  const scale = 0.8 + Math.random() * 0.6
+  const scale = 1 + Math.random() * 0.8
   group.scale.setScalar(scale)
 
   // Store movement data
@@ -193,9 +230,7 @@ function createEye() {
     rotationSpeed: (Math.random() - 0.5) * 0.01,
     pulseSpeed: 1 + Math.random() * 2,
     pulseOffset: Math.random() * Math.PI * 2,
-    glow: glow,
-    irisGlow: irisGlow,
-    pupilCore: pupilCore
+    glow: glow
   }
 
   return group
@@ -292,11 +327,11 @@ function animate() {
     if (irisGlow) irisGlow.material.opacity = 0.3 + pulse * 0.3
     if (pupilCore) pupilCore.scale.setScalar(0.8 + pulse * 0.4)
 
-    // Look at camera (creepy tracking)
+    // Look at mouse cursor (creepy tracking)
     const lookTarget = new THREE.Vector3(
-      camera.position.x + Math.sin(time * 1.5) * 3,
-      camera.position.y + Math.cos(time * 1.2) * 3,
-      camera.position.z
+      mouse.x * 30 + eye.position.x * 0.5,  // Offset based on eye position for parallax
+      mouse.y * 20 + eye.position.y * 0.5,
+      50  // In front of eyes (towards viewer)
     )
     eye.lookAt(lookTarget)
   })
@@ -339,6 +374,7 @@ function onResize() {
 function cleanup() {
   if (animationId) cancelAnimationFrame(animationId)
   window.removeEventListener('resize', onResize)
+  window.removeEventListener('mousemove', onMouseMove)
 
   eyes.forEach(eye => scene.remove(eye))
   eyes = []
@@ -366,5 +402,13 @@ onUnmounted(() => {
   inset: 0;
   z-index: 50;
   pointer-events: none;
+}
+
+.mouse-tracker {
+  position: fixed;
+  inset: 0;
+  z-index: 49;
+  pointer-events: auto;
+  cursor: default;
 }
 </style>
