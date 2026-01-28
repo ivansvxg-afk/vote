@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="bg">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ИЗБОРНИЯТ ДЕН — Интерактивна инсталация</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      height: 100%;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background: #111;
+      color: #eee;
+    }
+
+    .screen {
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2rem;
+      transition: background-color 0.3s ease;
+    }
+
+    #alert-title {
+      font-size: clamp(2rem, 6vw, 5rem);
+      line-height: 1;
+      margin-bottom: 0.5rem;
+    }
+
+    #alert-question {
+      font-size: clamp(1rem, 3.5vw, 2rem);
+      margin-bottom: 2rem;
+      letter-spacing: 0.02em;
+    }
+
+    .controls {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1.2rem;
+    }
+
+    .btn {
+      padding: 0.9rem 1.4rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+      transition: transform 0.12s ease, background 0.15s ease;
+    }
+
+    .btn:active {
+      transform: translateY(1px) scale(0.998);
+    }
+
+    .btn-yes {
+      background: rgba(0, 150, 136, 0.9);
+    }
+
+    .btn-no {
+      background: rgba(220, 40, 40, 0.95);
+    }
+
+    .btn-no.shake {
+      animation: shake 0.3s infinite;
+    }
+
+    .info-link a {
+      color: rgba(255, 255, 255, 0.85);
+      text-decoration: underline;
+      font-size: 0.95rem;
+    }
+
+    /* --- ОВЕРЛЕЙ / СПАМ --- */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 999;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .overlay-content {
+      background: #fff;
+      color: #111;
+      padding: 2rem;
+      border-radius: 10px;
+      width: min(580px, calc(100% - 3rem));
+      text-align: center;
+    }
+
+    .overlay-content h2 {
+      margin-bottom: 1rem;
+      color: #00968a;
+    }
+
+    .overlay-content p {
+      margin-bottom: 1.5rem;
+      font-size: 1.1rem;
+    }
+
+    /* СПАМ POPUP */
+    .spam {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(420px, calc(100% - 1rem));
+      background: #ff3b3b;
+      color: #fff;
+      padding: 1.2rem;
+      border-radius: 10px;
+      text-align: center;
+      box-shadow: 0 0 20px rgba(255, 0, 0, 0.6);
+      z-index: 1000;
+      animation: panic 0.5s infinite ease-in-out;
+    }
+
+    .spam.hidden {
+      display: none;
+    }
+
+    .spam-content h3 {
+      margin-bottom: 0.4rem;
+    }
+
+    @keyframes panic {
+      0% {
+        transform: translate(-50%, -50%) scale(1);
+      }
+
+      50% {
+        transform: translate(-50%, -49%) scale(1.06);
+      }
+
+      100% {
+        transform: translate(-50%, -50%) scale(1);
+      }
+    }
+
+    @keyframes shake {
+      0% {
+        transform: translateX(0);
+      }
+
+      25% {
+        transform: translateX(-3px);
+      }
+
+      50% {
+        transform: translateX(3px);
+      }
+
+      75% {
+        transform: translateX(-3px);
+      }
+
+      100% {
+        transform: translateX(0);
+      }
+    }
+
+    /* --- ЕМОЦИОНАЛНИ СТИЛОВЕ --- */
+    .screen.neutral {
+      background: #0b0b0b;
+    }
+
+    .screen.urgent {
+      animation: pulse 2.6s infinite ease-in-out;
+    }
+
+    .screen.election {
+      animation: flash 1s infinite steps(2, end);
+    }
+
+    .screen.infected {
+      animation: glitch-bg 0.12s infinite steps(2, end);
+      filter: url('#noise');
+      will-change: filter;
+      transform: translateZ(0);
+    }
+
+    .screen.infected h1,
+    .screen.infected p {
+      animation: glitch-text 0.15s infinite;
+    }
+
+    @keyframes pulse {
+      0% {
+        background-color: #0b0b0b;
+      }
+
+      50% {
+        background-color: #150e11;
+      }
+
+      100% {
+        background-color: #0b0b0b;
+      }
+    }
+
+    @keyframes flash {
+      0% {
+        background-color: #ff2d2d;
+        color: #fff;
+      }
+
+      50% {
+        background-color: #111;
+        color: #fff;
+      }
+
+      100% {
+        background-color: #ff2d2d;
+        color: #fff;
+      }
+    }
+
+    @keyframes glitch-bg {
+      0% {
+        background: #120000;
+      }
+
+      50% {
+        background: #2a0000;
+      }
+
+      100% {
+        background: #120000;
+      }
+    }
+
+    @keyframes glitch-text {
+      0% {
+        text-shadow: 2px 0 red, -2px 0 cyan;
+      }
+
+      50% {
+        text-shadow: -2px 0 red, 2px 0 cyan;
+      }
+
+      100% {
+        text-shadow: 1px 0 red, -1px 0 cyan;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .controls {
+        flex-direction: column;
+        width: 100%;
+      }
+
+      .btn {
+        width: 100%;
+        font-size: 1.05rem;
+      }
+    }
+
+    /* --- ДОПЪЛНИТЕЛНА ИНФОРМАЦИЯ --- */
+    .info-section {
+      background: #111;
+      color: #eee;
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 2rem;
+      border-radius: 12px;
+      text-align: left;
+      line-height: 1.6;
+    }
+
+    .info-section h2 {
+      color: #00c8b3;
+      margin-bottom: 0.6rem;
+    }
+
+    .info-section ul {
+      margin: 0.5rem 0 1.5rem 1.2rem;
+    }
+
+    .info-section li {
+      margin-bottom: 0.4rem;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- ИНТЕРАКТИВЕН ЕКРАН -->
+  <main id="alert-screen" class="screen neutral">
+    <h1 id="alert-title">ИЗБОРНИЯТ ДЕН Е ТУК.</h1>
+    <p id="alert-question">ЩЕ ГЛАСУВАШ ЛИ ДНЕС?</p>
+    <div class="controls">
+      <button id="btn-yes" class="btn btn-yes" aria-pressed="false">Гласувах / Ще гласувам</button>
+      <button id="btn-no" class="btn btn-no" aria-pressed="false">Няма да гласувам</button>
+    </div>
+    <div class="info-link">
+      <a id="more-info" href="#info" rel="noopener">Искам повече информация</a>
+    </div>
+  </main>
+
+  <!-- ПЛАТНО ЗА БЛАГОДАРНОСТ -->
+  <div id="thankyou" class="overlay hidden" role="dialog" aria-hidden="true">
+    <div class="overlay-content">
+      <h2>Извиняваме се и ви благодарим!</h2>
+      <p>Вашият глас има значение.</p>
+      <button id="close-thank" class="btn btn-yes">Затвори</button>
+    </div>
+  </div>
+
+  <!-- СПАМ POPUP -->
+  <div id="spam-popup" class="spam hidden">
+    <!-- <div class="spam-content" >
+      <h3>НЕ МОЖЕМ ДА ЗАТВОРИМ ТОВА СЪОБЩЕНИЕ!</h3>
+      <p>Гласувайте, за да спрете известията.</p>
+    </div> -->
+    <div id="kur" class="hidden">
+      <h3>НАИСТИНА ЛИ НЯМА ДА ГЛАСУВАШ?</h3>
+      <p>Пасивността е заразна.<br>
+        Ако всички безмълвно се откажат,<br>
+        губим право на избор.</p>
+      <p>
+      <strong>Системата</strong> записа решението ти...</p>
+      <button id="zatvori" style="display: block; width: 40px;height: 40px;background-color: purple">X</button>
+    </div>
+
+
+  </div>
+
+  <!-- ДОПЪЛНИТЕЛНА ИНФОРМАЦИЯ -->
+  <section id="info" class="info-section">
+    <h2>Защо е важно да гласуваме</h2>
+    <p>Гласуването е основен механизъм на демокрацията и начинът, по който гражданите изразяват своето мнение и влияние
+      върху бъдещето на обществото.</p>
+
+    <h2>Смисълът на гласуването</h2>
+    <ul>
+      <li>Всеки глас има значение.</li>
+      <li>Активното участие защитава вашите права и интереси.</li>
+      <li>Без участие малки групи взимат решения вместо мнозинството.</li>
+    </ul>
+
+    <h2>Как гласът влияе</h2>
+    <ul>
+      <li>Дори един глас може да промени резултата на местни избори.</li>
+      <li>Националните избори определят закони, социални програми и данъчни политики.</li>
+      <li>Пасивността води до концентрация на властта в малки групи.</li>
+    </ul>
+
+    <h2>Свободата на избора</h2>
+    <ul>
+      <li>Гласът трябва да е свободен, без натиск, страх или манипулация.</li>
+      <li>Информираността е ключ: гласувайте по принципи, не по слухове.</li>
+      <li>Свободният глас е защита на личните права и обществото.</li>
+    </ul>
+
+    <h2>Примери за информиран избор</h2>
+    <ul>
+      <li>Избор на местен съветник, който подобрява училищната инфраструктура.</li>
+      <li>Гласуване за здравеопазване, транспорт и социална подкрепа.</li>
+      <li>Подкрепа на референдуми с дългосрочно обществено значение.</li>
+    </ul>
+
+    <h2>Мотивация и отговорност</h2>
+    <ul>
+      <li>Всеки гражданин има право на информиран избор.</li>
+      <li>Честните избори изискват участие на всички.</li>
+      <li>Свободният глас дава стойност на демокрацията.</li>
+      <li>Гласуването е отговорност към себе си и обществото.</li>
+      <li>Активното участие предотвратява концентрация на властта и корупция.</li>
+    </ul>
+  </section>
+
+  <!-- АУДИО -->
+  <audio id="siren-audio" loop preload="auto">
+    <source src="audio/siren.mp3" type="audio/mpeg">
+  </audio>
+
+  <!-- SVG NOISE FILTER -->
+  <svg width="0" height="0">
+    <filter id="noise">
+      <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="3" result="noise" />
+      <feColorMatrix type="saturate" values="0" />
+      <feBlend in="SourceGraphic" in2="noise" mode="multiply" />
+    </filter>
+  </svg>
+
+  <script>
+    const alertScreen = document.getElementById('alert-screen');
+    const alertQuestion = document.getElementById('alert-question');
+    const btnYes = document.getElementById('btn-yes');
+    const btnNo = document.getElementById('btn-no');
+    const thankOverlay = document.getElementById('thankyou');
+    const closeThank = document.getElementById('close-thank');
+    const sirenAudio = document.getElementById('siren-audio');
+    const spamPopup = document.getElementById('spam-popup');
+
+    // State
+    let vibrationInterval = null;
+    let voiceTimeout = null;
+    let currentPhraseIndex = 0;
+
+    // Phrases to speak
+    const phrases = [
+      "Твоята пасивност е глас за корупцията.",
+      "Докато ти мълчиш, други решават вместо теб и предаваш своята свобода.",
+      "Докато ти отказваш, тях им е удобно.",
+      "Системата печели когато ти се откажеш.",
+      "Мислиш ли че няма значение? Те разчитат на това."
+    ];
+
+    function getDayParam() {
+      const params = new URLSearchParams(window.location.search);
+      const d = parseInt(params.get('day'), 10);
+      return Number.isFinite(d) ? d : null;
+    }
+
+    function setUrgencyByDay(day) {
+      alertScreen.classList.remove('neutral', 'urgent', 'election');
+
+      if (day === 1) {
+        alertQuestion.textContent = '1 ден до изборите — ще гласуваш ли?';
+        alertScreen.classList.add('urgent');
+        btnNo.classList.add('shake');
+      } else if (day === 0) {
+        alertQuestion.textContent = 'ИЗБОРНИЯТ ДЕН Е ТУК. ЩЕ ГЛАСУВАШ ЛИ ДНЕС?';
+        alertScreen.classList.add('election');
+        btnNo.classList.add('shake');
+      } else {
+        alertScreen.classList.add('neutral');
+      }
+    }
+
+    function startVibration() {
+      if ('vibrate' in navigator) {
+        vibrationInterval = setInterval(() => {
+          navigator.vibrate([200, 100, 200]);
+        }, 1000);
+      }
+    }
+
+    function stopVibration() {
+      if (vibrationInterval) {
+        clearInterval(vibrationInterval);
+        vibrationInterval = null;
+      }
+      if ('vibrate' in navigator) navigator.vibrate(0);
+    }
+
+    function speakPhrase() {
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(phrases[currentPhraseIndex]);
+        utterance.lang = 'bg-BG';
+        utterance.rate = 0.9;
+        utterance.pitch = 0.8;
+        utterance.volume = 1.0;
+
+        speechSynthesis.speak(utterance);
+        currentPhraseIndex = (currentPhraseIndex + 1) % phrases.length;
+        voiceTimeout = setTimeout(speakPhrase, 6000);
+      }
+    }
+
+    function startVoiceLoop() { currentPhraseIndex = 0; speakPhrase(); }
+    function stopVoiceLoop() { if (voiceTimeout) clearTimeout(voiceTimeout); if ('speechSynthesis' in window) speechSynthesis.cancel(); }
+
+    function tryPlaySiren() { sirenAudio.play().catch(() => { }); }
+    function stopSiren() { sirenAudio.pause(); sirenAudio.currentTime = 0; }
+
+    function showThankYou() {
+      thankOverlay.classList.remove('hidden');
+      thankOverlay.setAttribute('aria-hidden', 'false');
+      stopSiren(); stopVibration(); stopVoiceLoop();
+      spamPopup.classList.add('hidden');
+      alertScreen.classList.remove('infected');
+      btnNo.classList.remove('shake');
+    }
+
+    function hideThankYou() {
+      thankOverlay.classList.add('hidden');
+      thankOverlay.setAttribute('aria-hidden', 'true');
+    }
+
+    function handleYes() {
+      btnYes.setAttribute('aria-pressed', 'true');
+      btnNo.setAttribute('aria-pressed', 'false');
+      showThankYou();
+    }
+
+    function handleNo() {
+      btnNo.setAttribute('aria-pressed', 'true');
+      btnYes.setAttribute('aria-pressed', 'false');
+
+      tryPlaySiren(); startVibration(); startVoiceLoop();
+      alertScreen.classList.add('infected');
+
+      spamPopup.querySelector('#kur').classList.toggle('hidden')
+      spamPopup.classList.remove('hidden');
+    }
+
+    function init() {
+      document.getElementById('zatvori').addEventListener( () => {
+        alert('work');
+      })
+      btnYes.addEventListener('click', handleYes);
+      btnNo.addEventListener('click', handleNo);
+      closeThank.addEventListener('click', hideThankYou);
+      setUrgencyByDay(getDayParam());
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+
+</html>

@@ -94,7 +94,7 @@ onUnmounted(() => {
 .eyes-container {
   position: fixed;
   inset: 0;
-  z-index: 1100;
+  z-index: 100;
   pointer-events: none;
   overflow: hidden;
 }

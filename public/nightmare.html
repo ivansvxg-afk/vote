@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>СИСТЕМАТА ЗАПИСА РЕШЕНИЕТО ТИ</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: #0a0000;
+      color: #fff;
+      overflow: hidden;
+    }
+
+    .screen {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2rem;
+      animation: glitch-bg 0.15s infinite steps(2, end);
+      position: relative;
+    }
+
+    /* Glitch background */
+    @keyframes glitch-bg {
+      0% { background: #0a0000; }
+      25% { background: #1a0000; }
+      50% { background: #200000; }
+      75% { background: #0f0000; }
+      100% { background: #0a0000; }
+    }
+
+    /* Static noise overlay */
+    .static-overlay {
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+      opacity: 0.15;
+      pointer-events: none;
+      animation: static-flicker 0.1s infinite;
+      z-index: 100;
+    }
+
+    @keyframes static-flicker {
+      0%, 100% { opacity: 0.15; }
+      50% { opacity: 0.2; }
+    }
+
+    /* Vignette */
+    .vignette {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.8) 100%);
+      pointer-events: none;
+      z-index: 50;
+    }
+
+    /* Scanlines */
+    .scanlines {
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.3) 0px,
+        rgba(0, 0, 0, 0.3) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+      pointer-events: none;
+      z-index: 60;
+    }
+
+    /* Main content */
+    .content {
+      position: relative;
+      z-index: 10;
+    }
+
+    h1 {
+      font-size: clamp(1.8rem, 5vw, 3.5rem);
+      color: #ff0000;
+      text-shadow:
+        0 0 10px #ff0000,
+        0 0 20px #ff0000,
+        0 0 40px #ff0000;
+      animation: glitch-text 0.2s infinite, pulse-text 1s infinite;
+      margin-bottom: 1rem;
+    }
+
+    @keyframes glitch-text {
+      0% { text-shadow: 2px 0 red, -2px 0 cyan; transform: translate(0); }
+      25% { text-shadow: -2px 0 red, 2px 0 cyan; transform: translate(-2px, 1px); }
+      50% { text-shadow: 2px 0 red, -2px 0 cyan; transform: translate(2px, -1px); }
+      75% { text-shadow: -1px 0 red, 1px 0 cyan; transform: translate(-1px, -2px); }
+      100% { text-shadow: 1px 0 red, -1px 0 cyan; transform: translate(0); }
+    }
+
+    @keyframes pulse-text {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.8; }
+    }
+
+    .message {
+      font-size: 1.2rem;
+      color: #ccc;
+      margin-bottom: 2rem;
+      line-height: 1.8;
+    }
+
+    .message strong {
+      color: #ff4444;
+    }
+
+    /* Spam popup */
+    .spam-popup {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(450px, calc(100% - 2rem));
+      background: linear-gradient(135deg, #8b0000 0%, #ff0000 100%);
+      padding: 2rem;
+      border-radius: 15px;
+      text-align: center;
+      box-shadow:
+        0 0 30px rgba(255, 0, 0, 0.8),
+        0 0 60px rgba(255, 0, 0, 0.4);
+      z-index: 200;
+      animation: panic 0.4s infinite ease-in-out;
+    }
+
+    @keyframes panic {
+      0% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+      25% { transform: translate(-50%, -50%) scale(1.02) rotate(0.5deg); }
+      50% { transform: translate(-50%, -50%) scale(1.04) rotate(-0.5deg); }
+      75% { transform: translate(-50%, -50%) scale(1.02) rotate(0.3deg); }
+      100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+    }
+
+    .spam-popup h2 {
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+    }
+
+    .spam-popup p {
+      font-size: 1.1rem;
+      margin-bottom: 1.5rem;
+      line-height: 1.6;
+    }
+
+    .btn {
+      padding: 1rem 2rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin: 0.5rem;
+    }
+
+    .btn-yes {
+      background: #00c853;
+      color: #000;
+      box-shadow: 0 0 20px rgba(0, 200, 83, 0.5);
+    }
+
+    .btn-yes:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 40px rgba(0, 200, 83, 0.8);
+    }
+
+    .btn-close {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .btn-close:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Blood drips */
+    .blood-drip {
+      position: fixed;
+      top: 0;
+      width: 8px;
+      background: linear-gradient(to bottom, #8b0000, #ff0000, transparent);
+      border-radius: 0 0 4px 4px;
+      animation: drip 3s ease-in infinite;
+      z-index: 30;
+    }
+
+    @keyframes drip {
+      0% { height: 0; opacity: 1; }
+      80% { height: 200px; opacity: 1; }
+      100% { height: 200px; opacity: 0; }
+    }
+
+    /* Floating eyes */
+    .eye {
+      position: fixed;
+      width: 60px;
+      height: 60px;
+      background: radial-gradient(circle at 30% 30%, #fff 0%, #ffe0e0 70%);
+      border-radius: 50%;
+      box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+      z-index: 40;
+      animation: eye-float 3s ease-in-out infinite;
+    }
+
+    .eye::before {
+      content: '';
+      position: absolute;
+      width: 50%;
+      height: 50%;
+      top: 25%;
+      left: 25%;
+      background: radial-gradient(circle, #000 20%, #880000 40%, #ff4400 80%);
+      border-radius: 50%;
+    }
+
+    @keyframes eye-float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-15px); }
+    }
+
+    /* Success overlay */
+    .success-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.95);
+      display: none;
+      place-items: center;
+      z-index: 300;
+    }
+
+    .success-overlay.show {
+      display: grid;
+    }
+
+    .success-content {
+      background: linear-gradient(135deg, #1a2e1a 0%, #16213e 100%);
+      padding: 3rem;
+      border-radius: 20px;
+      text-align: center;
+      max-width: 500px;
+      border: 2px solid #00c853;
+      box-shadow: 0 0 40px rgba(0, 200, 83, 0.3);
+    }
+
+    .success-content h2 {
+      color: #00c853;
+      font-size: 2rem;
+      margin-bottom: 1rem;
+    }
+
+    .success-content p {
+      color: #ccc;
+      font-size: 1.1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .success-icon {
+      font-size: 4rem;
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="screen">
+    <div class="static-overlay"></div>
+    <div class="vignette"></div>
+    <div class="scanlines"></div>
+
+    <!-- Blood drips -->
+    <div class="blood-drip" style="left: 10%; animation-delay: 0s;"></div>
+    <div class="blood-drip" style="left: 25%; animation-delay: 0.5s;"></div>
+    <div class="blood-drip" style="left: 40%; animation-delay: 1s;"></div>
+    <div class="blood-drip" style="left: 60%; animation-delay: 1.5s;"></div>
+    <div class="blood-drip" style="left: 75%; animation-delay: 0.3s;"></div>
+    <div class="blood-drip" style="left: 90%; animation-delay: 0.8s;"></div>
+
+    <!-- Eyes -->
+    <div class="eye" style="top: 15%; left: 10%; animation-delay: 0s;"></div>
+    <div class="eye" style="top: 20%; right: 15%; animation-delay: 0.5s;"></div>
+    <div class="eye" style="bottom: 25%; left: 20%; animation-delay: 1s;"></div>
+    <div class="eye" style="bottom: 30%; right: 10%; animation-delay: 1.5s;"></div>
+
+    <div class="content">
+      <h1>СИСТЕМАТА ЗАПИСА РЕШЕНИЕТО ТИ</h1>
+      <p class="message">
+        <strong>Пасивността е заразна.</strong><br>
+        Ако всички безмълвно се откажат,<br>
+        губим право на избор.
+      </p>
+    </div>
+
+    <!-- Spam popup -->
+    <div class="spam-popup" id="spamPopup">
+      <h2>НАИСТИНА ЛИ НЯМА ДА ГЛАСУВАШ?</h2>
+      <p>
+        Твоята пасивност е глас за корупцията.<br>
+        Докато ти мълчиш, други решават вместо теб.
+      </p>
+      <div>
+        <button class="btn btn-yes" onclick="handleYes()">ДА, ЩЕ ГЛАСУВАМ!</button>
+        <button class="btn btn-close" onclick="closePopup()">Затвори</button>
+      </div>
+    </div>
+
+    <!-- Success overlay -->
+    <div class="success-overlay" id="successOverlay">
+      <div class="success-content">
+        <div class="success-icon">🗳️</div>
+        <h2>Благодарим ти!</h2>
+        <p>Твоят глас има значение. Заедно можем да направим промяна.</p>
+        <button class="btn btn-yes" onclick="goBack()">Затвори</button>
+      </div>
+    </div>
+  </div>
+
+  <audio id="sirenAudio" loop preload="auto">
+    <source src="/siren.mp3" type="audio/mpeg">
+  </audio>
+
+  <script>
+    const sirenAudio = document.getElementById('sirenAudio');
+    const spamPopup = document.getElementById('spamPopup');
+    const successOverlay = document.getElementById('successOverlay');
+
+    let voiceTimeout = null;
+    let currentPhraseIndex = 0;
+    let vibrationInterval = null;
+
+    const phrases = [
+      "Твоята пасивност е глас за корупцията.",
+      "Докато ти мълчиш, други решават вместо теб.",
+      "Докато ти отказваш, на тях им е удобно.",
+      "Системата печели когато ти се откажеш.",
+      "Мислиш ли че няма значение? Те разчитат на това.",
+      "Един глас по-малко. Точно това искат.",
+      "Страхът ти е тяхната победа.",
+      "Без теб демокрацията умира."
+    ];
+
+    function speakPhrase() {
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(phrases[currentPhraseIndex]);
+        utterance.lang = 'bg-BG';
+        utterance.rate = 0.85;
+        utterance.pitch = 0.7;
+        utterance.volume = 1.0;
+        speechSynthesis.speak(utterance);
+
+        currentPhraseIndex = (currentPhraseIndex + 1) % phrases.length;
+        voiceTimeout = setTimeout(speakPhrase, 5000);
+      }
+    }
+
+    function startVoiceLoop() {
+      currentPhraseIndex = 0;
+      speakPhrase();
+    }
+
+    function stopVoiceLoop() {
+      if (voiceTimeout) clearTimeout(voiceTimeout);
+      if ('speechSynthesis' in window) speechSynthesis.cancel();
+    }
+
+    function startVibration() {
+      if ('vibrate' in navigator) {
+        vibrationInterval = setInterval(() => {
+          navigator.vibrate([200, 100, 200, 100, 300]);
+        }, 1500);
+      }
+    }
+
+    function stopVibration() {
+      if (vibrationInterval) {
+        clearInterval(vibrationInterval);
+        vibrationInterval = null;
+      }
+      if ('vibrate' in navigator) navigator.vibrate(0);
+    }
+
+    function handleYes() {
+      // Save vote
+      const votes = JSON.parse(localStorage.getItem('voteStats') || '{"yes":0,"no":0}');
+      votes.yes++;
+      localStorage.setItem('voteStats', JSON.stringify(votes));
+
+      // Stop everything
+      sirenAudio.pause();
+      stopVoiceLoop();
+      stopVibration();
+
+      // Show success
+      successOverlay.classList.add('show');
+      spamPopup.style.display = 'none';
+    }
+
+    function closePopup() {
+      spamPopup.style.display = 'none';
+    }
+
+    function goBack() {
+      window.location.href = '/';
+    }
+
+    // Start nightmare mode
+    function init() {
+      // Save "no" vote
+      const votes = JSON.parse(localStorage.getItem('voteStats') || '{"yes":0,"no":0}');
+      votes.no++;
+      localStorage.setItem('voteStats', JSON.stringify(votes));
+
+      // Start effects
+      sirenAudio.play().catch(() => {});
+      startVoiceLoop();
+      startVibration();
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>

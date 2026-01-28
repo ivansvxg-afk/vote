@@ -1,6 +1,6 @@
 <template>
   <Transition name="crash-enter">
-    <div v-if="show" class="question-overlay" :class="{ shaking: isShaking }">
+    <div v-if="show" class="question-overlay" :class="{ shaking: isShaking }" @click="handleOverlayClick" @touchstart="handleOverlayTouch">
       <!-- Glitch layers -->
       <div class="glitch-layer glitch-1"></div>
       <div class="glitch-layer glitch-2"></div>
@@ -24,6 +24,9 @@
         <!-- Warning stripes -->
         <div class="warning-stripes top"></div>
         <div class="warning-stripes bottom"></div>
+
+        <!-- Countdown Timer -->
+        <CountdownTimer />
 
         <!-- Icon -->
         <div class="icon-container">
@@ -60,6 +63,7 @@
 
 <script setup>
 import { ref, watch, onMounted, onUnmounted } from 'vue'
+import CountdownTimer from './CountdownTimer.vue'
 
 const props = defineProps({
   show: { type: Boolean, default: false }
@@ -191,7 +195,105 @@ function makeDistortionCurve(amount) {
   return curve
 }
 
+// Vibration helper
+function vibrate(pattern) {
+  if ('vibrate' in navigator) {
+    navigator.vibrate(pattern)
+  }
+}
+
+// BASS RUMBLE - creates a deep bass sound that feels like vibration
+function playBassRumble(duration = 1.5, intensity = 0.8) {
+  try {
+    const ctx = initAudio()
+
+    // Main bass oscillator (very low frequency)
+    const bass = ctx.createOscillator()
+    bass.type = 'sine'
+    bass.frequency.setValueAtTime(30, ctx.currentTime) // Sub-bass
+
+    // Second bass layer
+    const bass2 = ctx.createOscillator()
+    bass2.type = 'sine'
+    bass2.frequency.setValueAtTime(45, ctx.currentTime)
+
+    // LFO for pulsing effect
+    const lfo = ctx.createOscillator()
+    const lfoGain = ctx.createGain()
+    lfo.frequency.value = 8 // Pulse rate
+    lfoGain.gain.value = 15
+    lfo.connect(lfoGain)
+    lfoGain.connect(bass.frequency)
+
+    // Distortion for more impact
+    const distortion = ctx.createWaveShaper()
+    distortion.curve = makeDistortionCurve(50)
+
+    // Main gain
+    const gain = ctx.createGain()
+    gain.gain.setValueAtTime(0, ctx.currentTime)
+    gain.gain.linearRampToValueAtTime(intensity, ctx.currentTime + 0.05)
+    gain.gain.setValueAtTime(intensity, ctx.currentTime + duration - 0.2)
+    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + duration)
+
+    // Connect everything
+    bass.connect(distortion)
+    bass2.connect(distortion)
+    distortion.connect(gain)
+    gain.connect(ctx.destination)
+
+    // Start
+    lfo.start()
+    bass.start()
+    bass2.start()
+
+    // Stop after duration
+    setTimeout(() => {
+      bass.stop()
+      bass2.stop()
+      lfo.stop()
+    }, duration * 1000)
+  } catch (e) {
+    console.log('Bass rumble error:', e)
+  }
+}
+
+// Short bass hit for interactions
+function playBassHit() {
+  try {
+    const ctx = initAudio()
+
+    const osc = ctx.createOscillator()
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(50, ctx.currentTime)
+    osc.frequency.exponentialRampToValueAtTime(20, ctx.currentTime + 0.3)
+
+    const gain = ctx.createGain()
+    gain.gain.setValueAtTime(0.9, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3)
+
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+
+    osc.start()
+    osc.stop(ctx.currentTime + 0.3)
+  } catch (e) {}
+}
+
+// Handle any touch/click on the overlay - trigger vibration + bass
+function handleOverlayClick() {
+  vibrate([300, 100, 300])
+  playBassHit()
+}
+
+function handleOverlayTouch() {
+  vibrate([300, 100, 300])
+  playBassHit()
+}
+
 // Trigger effects when shown
+let bassInterval = null
+
 watch(() => props.show, (newVal) => {
   if (newVal) {
     // Flash effect
@@ -202,19 +304,47 @@ watch(() => props.show, (newVal) => {
     playCrashSound()
     setTimeout(() => playAlarmSound(), 200)
 
-    // Start shaking
+    // BASS RUMBLE - deep vibration-like sound
+    playBassRumble(2, 0.9)
+
+    // VIBRATION - aggressive alarm pattern
+    vibrate([500, 100, 500, 100, 500, 100, 800])
+
+    // Start shaking with continuous bass
     isShaking.value = true
     shakeInterval = setInterval(() => {
       isShaking.value = !isShaking.value
       setTimeout(() => isShaking.value = true, 50)
+      // Vibrate on each shake cycle
+      vibrate([200, 100, 200])
     }, 2000)
+
+    // Continuous bass rumble every 3 seconds
+    bassInterval = setInterval(() => {
+      playBassRumble(1.5, 0.7)
+    }, 3000)
   } else {
     isShaking.value = false
     if (shakeInterval) clearInterval(shakeInterval)
+    if (bassInterval) clearInterval(bassInterval)
+    vibrate(0) // Stop vibration
   }
 })
 
+function saveVote(willVote) {
+  const votes = JSON.parse(localStorage.getItem('voteStats') || '{"yes":0,"no":0}')
+  if (willVote) {
+    votes.yes++
+  } else {
+    votes.no++
+  }
+  localStorage.setItem('voteStats', JSON.stringify(votes))
+}
+
 function handleYes() {
+  // Save vote
+  saveVote(true)
+
   // Success sound
   try {
     const ctx = initAudio()
@@ -236,6 +366,9 @@ function handleYes() {
 }
 
 function handleNo() {
+  // Save vote
+  saveVote(false)
+
   // Error/danger sound
   try {
     const ctx = initAudio()
@@ -257,6 +390,7 @@ function handleNo() {
 
 onUnmounted(() => {
   if (shakeInterval) clearInterval(shakeInterval)
+  if (bassInterval) clearInterval(bassInterval)
 })
 </script>
 
